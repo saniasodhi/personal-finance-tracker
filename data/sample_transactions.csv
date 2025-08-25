@@ -1,0 +1,7 @@
+date,description,category,amount,payment_method
+2025-08-01,Starbucks,Food & Drinks,220,Card
+2025-08-02,Uber,Transport,340,UPI
+2025-08-02,Amazon order,Shopping,1299,Card
+2025-08-03,Rent,Housing,12000,Bank Transfer
+2025-08-04,Big Bazaar,Groceries,1850,Card
+2025-08-05,Movie,Pleasure,450,UPI
