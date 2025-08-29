@@ -1,7 +1,6 @@
-date,description,category,amount,payment_method
-2025-08-01,Starbucks,Food & Drinks,220,Card
-2025-08-02,Uber,Transport,340,UPI
-2025-08-02,Amazon order,Shopping,1299,Card
-2025-08-03,Rent,Housing,12000,Bank Transfer
-2025-08-04,Big Bazaar,Groceries,1850,Card
-2025-08-05,Movie,Pleasure,450,UPI
+date,category,description,money_spent,money_left,payment_method
+2025-08-01,Food,Starbucks Coffee,200,4800,UPI
+2025-08-02,Transport,Uber Ride,150,4650,UPI
+2025-08-03,Shopping,Amazon Earphones,1200,3450,UPI
+2025-08-04,Housing,PG Rent,8000,2000,UPI
+2025-08-05,Food,Dominos Pizza,500,1500,UPI
