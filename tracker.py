@@ -129,13 +129,47 @@ def add_expense(date, category, description, money_spent, money_left=None, start
     print("✅ Saved (auto-categorized):", row.iloc[0].to_dict())
 
 
-def show_tail(n=20):
-    """Show the last N transactions."""
+def show_tail(n=20, month=None):
     df = load_store()
     if df.empty:
         print("No transactions yet.")
+        return
+    if month:
+        df = df[df["date"].astype(str).str.startswith(month)]
+    print(df.tail(n).to_string(index=False))
+
+
+def add_income(date, description, amount, start_balance=None):
+    """
+    Add an income row (money added to balance).
+    Stored as a negative money_spent, so balance increases.
+    """
+    ensure_store()
+    dt = parse(str(date)).date()
+    amt = float(amount)
+
+    # Determine base balance
+    base = None
+    if start_balance is not None:
+        base = float(start_balance)
     else:
-        print(df.tail(n).to_string(index=False))
+        base = last_balance() or 0.0
+
+    new_balance = base + amt
+
+    row = pd.DataFrame([{
+        "date": dt,
+        "category": "Income",
+        "description": description,
+        "money_spent": -amt,   # negative = income
+        "money_left": new_balance,
+        "payment_method": "UPI"
+    }])
+
+    out = pd.concat([load_store(), row], ignore_index=True)
+    out = auto_categorize(out)
+    out.to_csv(STORE, index=False)
+    print("✅ Income added:", row.iloc[0].to_dict())
 
 # --------------------------
 # CLI
@@ -157,6 +191,7 @@ def main():
     s_add.add_argument("--cat",  required=True, help="Category")
     s_add.add_argument("--desc", required=True, help="Description")
     s_add.add_argument("--spent", required=True, type=float, help="Money spent")
+
     # Optional: either give --left to set manually OR give --start for the very first entry
     s_add.add_argument("--left",  type=float, help="Money left after spending (optional, auto if omitted)")
     s_add.add_argument("--start", type=float, help="Starting balance (only needed for your first entry)")
@@ -164,14 +199,24 @@ def main():
     # show
     s_show = sub.add_parser("show", help="Show last N transactions")
     s_show.add_argument("-n", type=int, default=20)
+    s_show.add_argument("--month", help="Filter by YYYY-MM (e.g., 2025-09)")
+
 
     # ---- categorize ----
     s_cat = sub.add_parser("categorize", help="Auto-categorize and save file")
 
     # ---- summary ----
     s_sum = sub.add_parser("summary", help="Show total spend by category")
-    s_sum.add_argument("--top", type=int, default=10, help="Show top N categories")
+    s_sum.add_argument("--top", type=int, default=10)
+    s_sum.add_argument("--month", help="Filter by YYYY-MM (e.g., 2025-09)")
 
+
+    # income
+    s_inc = sub.add_parser("income", help="Add money (increase balance)")
+    s_inc.add_argument("--date", required=True, help="YYYY-MM-DD")
+    s_inc.add_argument("--desc", required=True, help="Description (e.g., Pocket Money)")
+    s_inc.add_argument("--amount", required=True, type=float, help="Amount added")
+    s_inc.add_argument("--start", type=float, help="Starting balance (only for first row)")
 
     args = p.parse_args()
     if args.cmd == "import":
@@ -187,17 +232,48 @@ def main():
             start_balance=args.start
         )
 
+    elif args.cmd == "income":
+        add_income(
+            date=args.date,
+            description=args.desc,
+            amount=args.amount,
+            start_balance=args.start
+        )
+
+
     elif args.cmd == "show":
-        show_tail(args.n)
+        show_tail(args.n, args.month)
+
 
     elif args.cmd == "summary":
         df = load_store()
         if df.empty:
             print("No transactions yet.")
         else:
+            if args.month:
+                df = df[df["date"].astype(str).str.startswith(args.month)]
             df = auto_categorize(df)
-            totals = df.groupby("category")["money_spent"].sum().sort_values(ascending=False)
-            print(totals.head(args.top).to_string())
+
+            # Split income vs expense
+            df["income"] = df["money_spent"].apply(lambda x: -x if x < 0 else 0)
+            df["expense"] = df["money_spent"].apply(lambda x: x if x > 0 else 0)
+
+            # Group by category
+            grouped = df.groupby("category")[["income", "expense"]].sum().sort_values("expense", ascending=False)
+
+            print("\n📊 Category Summary")
+            print(grouped.to_string())
+
+            # Net totals
+            total_income = df["income"].sum()
+            total_expense = df["expense"].sum()
+            net = total_income - total_expense
+
+            print("\n Totals")
+            print(f"Total Income : {total_income}")
+            print(f"Total Expense: {total_expense}")
+            print(f"Net Balance  : {net}")
+
 
     elif args.cmd == "categorize":
         df = load_store()
@@ -214,6 +290,13 @@ def main():
             totals = df.groupby("category")["money_spent"].sum().sort_values(ascending=False)
             print(totals.head(args.top).to_string())
 
+    elif args.cmd == "income":
+        add_income(
+            date=args.date,
+            description=args.desc,
+            amount=args.amount,
+            start_balance=args.start
+        )
 
 if __name__ == "__main__":
     main()
