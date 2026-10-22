@@ -9,3 +9,7 @@ __pycache__/
 # Private
 credentials.json
 data/transactions.csv
+
+# Web app
+node_modules/
+web/dist/

@@ -20,8 +20,8 @@ def auto_categorize(df: pd.DataFrame) -> pd.DataFrame:
     df["description"] = df["description"].astype(str).str.lower()
 
     def classify(desc, existing):
-        if pd.notna(existing) and str(existing).strip():
-            return existing  # keep existing
+        if pd.notna(existing) and str(existing).strip() not in ("", "-"):
+            return existing  # keep existing; "-" means "pick one for me"
         for cat, patterns in CATEGORY_RULES.items():
             for pat in patterns:
                 if re.search(pat, desc):

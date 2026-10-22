@@ -1,0 +1,84 @@
+/* Kharcha design tokens: "Rupee Bazaar" palette on a polished dark ground. */
+:root {
+  --bg: #13060b;
+  --surface: #1d0b13;
+  --surface-2: #28111c;
+  --surface-3: #351826;
+  --line: rgba(255, 236, 224, 0.09);
+  --line-strong: rgba(255, 236, 224, 0.18);
+  --text: #fbefe6;
+  --muted: #d2b5bf;
+  --muted-2: #a98a97;
+  --marigold: #ffb627;
+  --marigold-hover: #ffc75a;
+  --saffron: #ff8a1f;
+  --maroon: #5a0f2e;
+  --ink: #2a0816;
+  --income: #5ee29a;
+  --danger: #ff7a7a;
+
+  --cat-food: #ffb627;
+  --cat-transport: #6fa8ff;
+  --cat-shopping: #ff6f91;
+  --cat-housing: #b794ff;
+  --cat-health: #4fd1c5;
+  --cat-pleasure: #ff8a4c;
+  --cat-income: #5ee29a;
+  --cat-other: #a98a97;
+
+  --font-display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+  --font-body: 'Hind', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--marigold); }
+a:hover { color: var(--marigold-hover); }
+
+:focus-visible { outline: 2px solid var(--marigold); outline-offset: 3px; border-radius: 6px; }
+
+button, input, select { font: inherit; color: inherit; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 44px; padding: 12px 20px; border-radius: 12px; border: 1px solid transparent;
+  font-weight: 600; font-size: 16px; line-height: 1.2; text-decoration: none; cursor: pointer;
+  transition: background-color .15s, border-color .15s, transform .15s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--marigold); color: var(--ink); }
+.btn-primary:hover { background: var(--marigold-hover); color: var(--ink); }
+.btn-ghost { background: transparent; border-color: var(--line-strong); color: var(--text); }
+.btn-ghost:hover { border-color: var(--muted-2); color: var(--text); background: rgba(255,255,255,0.03); }
+.btn-lg { min-height: 56px; padding: 16px 26px; font-size: 18px; border-radius: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
