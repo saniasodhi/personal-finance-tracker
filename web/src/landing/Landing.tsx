@@ -82,7 +82,7 @@ export default function Landing() {
               <button type="button" aria-pressed={lang === 'hi'} onClick={() => setLang('hi')} lang="hi">हिं</button>
             </div>
             <a className="icon-btn gh" href={REPO_URL} aria-label="Kharcha on GitHub"><GitHub /></a>
-            <a className="btn btn-primary" href="app/">{t.openApp}</a>
+            <a className="btn btn-primary" href="app/index.html">{t.openApp}</a>
           </div>
         </nav>
       </header>
@@ -97,8 +97,8 @@ export default function Landing() {
               <h1><span>{t.heroA}</span><span className="accent">{t.heroB}</span></h1>
               <p className="hero-sub">{t.heroSub}</p>
               <div className="hero-ctas">
-                <a className="btn btn-primary btn-lg" href="app/">{t.ctaPrimary}<Arrow /></a>
-                <a className="btn btn-ghost btn-lg" href="app/?sample=1">{t.ctaSample}</a>
+                <a className="btn btn-primary btn-lg" href="app/index.html">{t.ctaPrimary}<Arrow /></a>
+                <a className="btn btn-ghost btn-lg" href="app/index.html?sample=1">{t.ctaSample}</a>
               </div>
               <p className="trust"><Lock />{t.trust}</p>
             </div>
@@ -263,7 +263,7 @@ export default function Landing() {
           <div className="final-inner">
             <h2>{t.finalTitle}</h2>
             <p>{t.finalSub}</p>
-            <a className="btn btn-dark btn-lg" href="app/">{t.ctaPrimary}<Arrow /></a>
+            <a className="btn btn-dark btn-lg" href="app/index.html">{t.ctaPrimary}<Arrow /></a>
           </div>
         </section>
       </main>

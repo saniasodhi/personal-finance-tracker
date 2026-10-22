@@ -95,7 +95,7 @@ export default function App() {
     <div className="app">
       <header className="app-nav">
         <div className="wrap app-nav-inner">
-          <a className="brand" href="../" aria-label="Kharcha home">
+          <a className="brand" href="../index.html" aria-label="Kharcha home">
             <span className="brand-hi" aria-hidden="true">खर्चा</span>
             <span className="brand-en">kharcha</span>
           </a>
