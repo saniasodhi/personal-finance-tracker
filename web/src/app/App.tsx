@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { REPO_URL } from '../config';
 import { download, toCsv } from '../core/files';
 import { monthLabel, rupees, shiftMonth, shortDate, signedRupees, todayIso } from '../core/format';
@@ -18,22 +18,37 @@ type DialogName = 'add' | 'import' | 'budget' | 'settings' | null;
 
 const SAMPLE_HREF = '../sample_transactions.csv';
 
+function initialLedger(): Ledger {
+  const saved = loadLedger();
+  if (new URLSearchParams(location.search).has('sample') && saved.transactions.length === 0) {
+    const sample = sampleLedger();
+    saveLedger(sample);
+    return sample;
+  }
+  return saved;
+}
+
+/** The ledger plus an `update` that applies a change and saves it to this browser. */
 function useLedger() {
-  const [ledger, setLedger] = useState<Ledger>(() => {
-    const wantsSample = new URLSearchParams(location.search).has('sample');
-    const saved = loadLedger();
-    return wantsSample && saved.transactions.length === 0 ? sampleLedger() : saved;
-  });
+  const [ledger, setLedger] = useState<Ledger>(initialLedger);
   const [saveFailed, setSaveFailed] = useState(false);
-  useEffect(() => { setSaveFailed(!saveLedger(ledger)); }, [ledger]);
+  const latest = useRef(ledger);
+
+  const update = useCallback((change: (l: Ledger) => Ledger) => {
+    const next = change(latest.current);
+    latest.current = next;
+    setLedger(next);
+    setSaveFailed(!saveLedger(next));
+  }, []);
+
   useEffect(() => {
     if (location.search) history.replaceState(null, '', location.pathname);
   }, []);
-  return [ledger, setLedger, saveFailed] as const;
+  return [ledger, update, saveFailed] as const;
 }
 
 export default function App() {
-  const [ledger, setLedger, saveFailed] = useLedger();
+  const [ledger, update, saveFailed] = useLedger();
   const [dialog, setDialog] = useState<DialogName>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [toast, setToast] = useState('');
@@ -43,10 +58,7 @@ export default function App() {
   const today = todayIso();
   const dataMonths = monthsOf(ledger);
   const [month, setMonth] = useState(() => dataMonths[0] ?? today.slice(0, 7));
-  const monthOptions = useMemo(
-    () => [...new Set([today.slice(0, 7), ...dataMonths, month])].sort().reverse(),
-    [dataMonths.join(), month, today],
-  );
+  const monthOptions = [...new Set([today.slice(0, 7), ...dataMonths, month])].sort().reverse();
 
   useEffect(() => {
     if (!toast) return;
@@ -72,7 +84,7 @@ export default function App() {
 
   function saveEntry(e: EntryInput) {
     const entry = { date: e.date, description: e.description, amount: e.amount, category: e.category, paymentMethod: e.paymentMethod };
-    setLedger((l) => (e.kind === 'expense' ? addExpense(l, entry) : addIncome(l, entry)));
+    update((l) => (e.kind === 'expense' ? addExpense(l, entry) : addIncome(l, entry)));
     setMonth(e.date.slice(0, 7));
     setToast(`Saved ${e.kind === 'expense' ? '−' : '+'}${rupees(e.amount)} · ${e.description}`);
   }
@@ -113,9 +125,9 @@ export default function App() {
         {!hasData ? (
           <Onboarding
             startBalance={ledger.startBalance}
-            onStart={(n) => { setLedger((l) => ({ ...l, startBalance: n })); setDialog('add'); }}
+            onStart={(n) => { update((l) => ({ ...l, startBalance: n })); setDialog('add'); }}
             onImport={() => setDialog('import')}
-            onSample={() => { const s = sampleLedger(); setLedger(s); setMonth(today.slice(0, 7)); }}
+            onSample={() => { update(() => sampleLedger()); setMonth(today.slice(0, 7)); }}
           />
         ) : (
           <>
@@ -161,7 +173,7 @@ export default function App() {
                             <span className="budget-name">{b.name}</span>
                             <span className="budget-actions">
                               <button type="button" className="icon-btn" aria-label={`Edit ${b.name}`} onClick={() => { setEditingBudget(b); setDialog('budget'); }}><Pencil /></button>
-                              <button type="button" className="icon-btn" aria-label={`Delete ${b.name}`} onClick={() => setLedger((l) => deleteBudget(l, b.id))}><Trash /></button>
+                              <button type="button" className="icon-btn" aria-label={`Delete ${b.name}`} onClick={() => update((l) => deleteBudget(l, b.id))}><Trash /></button>
                             </span>
                           </div>
                           <div className={`bar${over ? ' over' : ''}`} role="progressbar" aria-label={b.name} aria-valuemin={0} aria-valuemax={b.limit} aria-valuenow={spent}>
@@ -208,7 +220,7 @@ export default function App() {
                           <td>
                             <label className="sr-only" htmlFor={`c-${r.id}`}>Category for {r.description}</label>
                             <select id={`c-${r.id}`} className="cat-select" value={r.category} style={{ color: catColor(r.category) }}
-                              onChange={(e) => setLedger((l) => updateTransaction(l, r.id, { category: e.target.value }))}>
+                              onChange={(e) => update((l) => updateTransaction(l, r.id, { category: e.target.value }))}>
                               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                             </select>
                           </td>
@@ -216,7 +228,7 @@ export default function App() {
                           <td className="num" style={{ color: r.balance < 0 ? 'var(--danger)' : 'var(--muted)' }}>{rupees(r.balance)}</td>
                           <td style={{ width: 44 }}>
                             <button type="button" className="icon-btn" aria-label={`Delete ${r.description}`}
-                              onClick={() => { setLedger((l) => deleteTransaction(l, r.id)); setToast(`Deleted ${r.description}`); }}><Trash /></button>
+                              onClick={() => { update((l) => deleteTransaction(l, r.id)); setToast(`Deleted ${r.description}`); }}><Trash /></button>
                           </td>
                         </tr>
                       ))}
@@ -239,19 +251,19 @@ export default function App() {
       <AddDialog open={dialog === 'add'} onClose={() => setDialog(null)} categories={categories} onSave={saveEntry} />
       <ImportDialog open={dialog === 'import'} onClose={() => setDialog(null)} sampleHref={SAMPLE_HREF}
         onImport={(r) => {
-          setLedger((l) => importTransactions(l, r.transactions, r.inferredStartBalance));
+          update((l) => importTransactions(l, r.transactions, r.inferredStartBalance));
           setMonth(r.transactions[r.transactions.length - 1].date.slice(0, 7));
           setDialog(null);
           setToast(`Imported ${r.transactions.length} transactions`);
         }} />
       <BudgetDialog open={dialog === 'budget'} onClose={() => setDialog(null)} budget={editingBudget} categories={categories} month={month}
-        onSave={(b) => { setLedger((l) => upsertBudget(l, b)); setDialog(null); }} />
+        onSave={(b) => { update((l) => upsertBudget(l, b)); setDialog(null); }} />
       <SettingsDialog open={dialog === 'settings'} onClose={() => setDialog(null)} hasData={hasData}
         startBalance={ledger.startBalance}
-        onStartBalance={(n) => { setLedger((l) => ({ ...l, startBalance: n })); setToast('Starting balance updated'); }}
+        onStartBalance={(n) => { update((l) => ({ ...l, startBalance: n })); setToast('Starting balance updated'); }}
         onExport={() => download(`kharcha-${today}.csv`, toCsv(ledger))}
-        onSample={() => { setLedger(sampleLedger()); setMonth(today.slice(0, 7)); setDialog(null); setToast('Sample data loaded'); }}
-        onReset={() => { clearLedger(); setLedger(emptyLedger()); setDialog(null); setToast('All data deleted'); }} />
+        onSample={() => { update(() => sampleLedger()); setMonth(today.slice(0, 7)); setDialog(null); setToast('Sample data loaded'); }}
+        onReset={() => { clearLedger(); update(() => emptyLedger()); setDialog(null); setToast('All data deleted'); }} />
 
       <div aria-live="polite" className={toast ? 'toast-msg' : 'sr-only'}>{toast}</div>
     </div>

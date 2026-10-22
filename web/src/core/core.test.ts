@@ -5,6 +5,7 @@ import {
   addExpense, addIncome, budgetSpent, currentBalance, dailySpend, importTransactions, summarize, withBalances,
 } from './ledger';
 import { normalizeRows, parseAmount, parseDate } from './normalize';
+import { sanitizeLedger } from './storage';
 import { emptyLedger } from './types';
 
 // Same shape as data/sample_transactions.csv, with balances that add up.
@@ -98,5 +99,69 @@ describe('ledger', () => {
   it('exports in the CLI column format', () => {
     const l = importTransactions(emptyLedger(), parseCsvText(SAMPLE_CSV).transactions, 5000);
     expect(toCsv(l).split(/\r?\n/).join('\n')).toBe(SAMPLE_CSV);
+  });
+});
+
+describe('import edge cases', () => {
+  it('reads full month names and month-first dates when day-first is impossible', () => {
+    expect(parseDate('5 August 2025')).toBe('2025-08-05');
+    expect(parseDate('September 3, 2025')).toBe('2025-09-03');
+    expect(parseDate('08/31/2025')).toBe('2025-08-31');
+    expect(parseDate('05-Aug-25')).toBe('2025-08-05');
+  });
+
+  it('understands Dr/Cr type columns and "+" for money in', () => {
+    const typed = normalizeRows([
+      { Date: '01/09/2025', Description: 'Salary', Amount: '10,000', 'Dr/Cr': 'CR' },
+      { Date: '02/09/2025', Description: 'Swiggy', Amount: '240', 'Dr/Cr': 'DR' },
+    ]);
+    expect(typed.transactions.map((t) => t.amount)).toEqual([-10000, 240]);
+
+    const signed = normalizeRows([
+      { Date: '2025-09-01', 'Paid to': 'Refund from Myntra', 'Amount (INR)': '+₹500' },
+      { Date: '2025-09-02', 'Paid to': 'Zomato', 'Amount (INR)': '−₹350' },
+    ]);
+    expect(signed.transactions.map((t) => [t.description, t.amount, t.category])).toEqual([
+      ['Refund from Myntra', -500, 'Income'],
+      ['Zomato', 350, 'Food'],
+    ]);
+  });
+
+  it('skips zero and junk rows and ignores account details above the table', () => {
+    const rows = sheetToRows([
+      ['Statement date', '01/09/2025'],
+      ['Date', 'Narration', 'Debit', 'Credit'],
+      ['01/09/2025', 'Opening', '', ''],
+      ['', 'Total', '240', ''],
+      ['02/09/2025', 'Uber', '240', ''],
+    ]);
+    const r = normalizeRows(rows);
+    expect(r.transactions).toHaveLength(1);
+    expect(r.skipped).toBe(2);
+    expect(r.transactions[0]).toMatchObject({ description: 'Uber', category: 'Transport' });
+  });
+
+  it('never turns odd cells into "[object Object]"', () => {
+    const r = normalizeRows([{ date: new Date(Date.UTC(2025, 8, 1)), description: { x: 1 }, amount: 100 }]);
+    expect(r.transactions[0]).toMatchObject({ date: '2025-09-01', description: 'Untitled' });
+  });
+});
+
+describe('storage', () => {
+  it('drops malformed rows from a corrupted save', () => {
+    const l = sanitizeLedger({
+      startBalance: '5',
+      transactions: [
+        { id: 'a', date: '2025-09-01', description: 'ok', category: 'Food', amount: 10, paymentMethod: 'UPI' },
+        { date: 'yesterday', amount: 5 },
+        { date: '2025-09-02', amount: 'ten' },
+        null,
+      ],
+      budgets: [{ name: 'x', limit: 0, start: '2025-09-01', end: '2025-09-30' }],
+    });
+    expect(l.startBalance).toBe(0);
+    expect(l.transactions).toHaveLength(1);
+    expect(l.budgets).toHaveLength(0);
+    expect(sanitizeLedger('garbage').transactions).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@
 
 import Papa from 'papaparse';
 import { withBalances } from './ledger';
-import { normalizeRows, type NormalizeResult, type RawRow } from './normalize';
+import { cellText, isHeaderRow, normalizeRows, type NormalizeResult, type RawRow } from './normalize';
 import type { Ledger } from './types';
 
 export function parseCsvText(text: string): NormalizeResult {
@@ -10,14 +10,19 @@ export function parseCsvText(text: string): NormalizeResult {
   return normalizeRows(data);
 }
 
-/** Turn a 2D sheet (first row = headers) into keyed rows. Finds the header row in bank statements that start with a preamble. */
+/**
+ * Turn a 2D sheet into keyed rows. The header is the first row with a date
+ * column and an amount column, so account details above the table are skipped.
+ */
 export function sheetToRows(sheet: unknown[][]): RawRow[] {
-  const headerIdx = sheet.findIndex((r) =>
-    r.some((c) => /date/i.test(String(c ?? ''))) && r.filter((c) => c != null && c !== '').length >= 2,
-  );
+  const headerIdx = sheet.findIndex((r) => Array.isArray(r) && isHeaderRow(r));
   if (headerIdx < 0) return [];
-  const headers = sheet[headerIdx].map((h) => String(h ?? '').trim());
-  return sheet.slice(headerIdx + 1).map((r) => Object.fromEntries(headers.map((h, i) => [h, r[i]])));
+  const headers = sheet[headerIdx].map((h) => cellText(h).trim());
+  return sheet.slice(headerIdx + 1).map((r) => {
+    const row: RawRow = {};
+    headers.forEach((h, i) => { if (h) row[h] = Array.isArray(r) ? r[i] : undefined; });
+    return row;
+  });
 }
 
 export async function readStatementFile(file: File): Promise<NormalizeResult> {

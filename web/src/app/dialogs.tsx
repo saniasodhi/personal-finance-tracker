@@ -5,6 +5,13 @@ import type { NormalizeResult } from '../core/normalize';
 import type { Budget } from '../core/types';
 import { Close, Upload } from './icons';
 
+/** A form field's text value (never a File). */
+const text = (f: FormData, name: string) => {
+  const v = f.get(name);
+  return typeof v === 'string' ? v : '';
+};
+
+/** Children render only while open, so their state resets every time the dialog opens. */
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -54,11 +61,11 @@ export function AddDialog({ open, onClose, categories, onSave }: {
     if (!(amount > 0)) { setError('Enter an amount greater than 0.'); return; }
     onSave({
       kind,
-      date: String(f.get('date')),
-      description: String(f.get('description')),
+      date: text(f, 'date'),
+      description: text(f, 'description'),
       amount,
-      category: String(f.get('category')),
-      paymentMethod: String(f.get('method')),
+      category: text(f, 'category'),
+      paymentMethod: text(f, 'method'),
     });
     setError('');
     e.currentTarget.reset();
@@ -115,13 +122,20 @@ export function AddDialog({ open, onClose, categories, onSave }: {
 export function ImportDialog({ open, onClose, onImport, sampleHref }: {
   open: boolean; onClose: () => void; onImport: (r: NormalizeResult) => void; sampleHref: string;
 }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Import a statement">
+      <ImportBody onClose={onClose} onImport={onImport} sampleHref={sampleHref} />
+    </Modal>
+  );
+}
+
+function ImportBody({ onClose, onImport, sampleHref }: {
+  onClose: () => void; onImport: (r: NormalizeResult) => void; sampleHref: string;
+}) {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<(NormalizeResult & { name: string }) | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (!open) { setResult(null); setError(''); } }, [open]);
 
   async function handle(file: File | undefined) {
     if (!file) return;
@@ -138,7 +152,7 @@ export function ImportDialog({ open, onClose, onImport, sampleHref }: {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Import a statement">
+    <>
       <label
         className={`dropzone${drag ? ' drag' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -148,8 +162,8 @@ export function ImportDialog({ open, onClose, onImport, sampleHref }: {
         <Upload />
         <strong>{busy ? 'Reading…' : 'Drop a CSV or .xlsx file here'}</strong>
         <span>or click to choose one. It is read on your device and never uploaded.</span>
-        <input ref={inputRef} type="file" accept=".csv,.xlsx,text/csv" className="sr-only"
-          onChange={(e) => void handle(e.target.files?.[0])} />
+        <input type="file" accept=".csv,.xlsx,text/csv" className="sr-only"
+          onChange={(e) => { void handle(e.target.files?.[0]); e.target.value = ''; }} />
       </label>
       {error && <p className="error" role="alert">{error}</p>}
       {result && (
@@ -172,7 +186,7 @@ export function ImportDialog({ open, onClose, onImport, sampleHref }: {
           Import {result ? result.transactions.length : ''} transactions
         </button>
       </div>
-    </Modal>
+    </>
   );
 }
 
@@ -191,11 +205,11 @@ export function BudgetDialog({ open, onClose, budget, categories, month, onSave 
     const f = new FormData(e.currentTarget);
     onSave({
       id: budget?.id,
-      name: String(f.get('name')).trim() || 'Budget',
-      limit: Number(f.get('limit')),
-      start: String(f.get('start')),
-      end: String(f.get('end')),
-      categories: f.getAll('cats').map(String),
+      name: text(f, 'name').trim() || 'Budget',
+      limit: Number(text(f, 'limit')),
+      start: text(f, 'start'),
+      end: text(f, 'end'),
+      categories: f.getAll('cats').filter((c): c is string => typeof c === 'string'),
     });
   }
 
@@ -247,14 +261,11 @@ export function SettingsDialog({ open, onClose, startBalance, onStartBalance, on
   open: boolean; onClose: () => void; startBalance: number; onStartBalance: (n: number) => void;
   onExport: () => void; onSample: () => void; onReset: () => void; hasData: boolean;
 }) {
-  const [confirmReset, setConfirmReset] = useState(false);
-  useEffect(() => { if (!open) setConfirmReset(false); }, [open]);
-
   return (
     <Modal open={open} onClose={onClose} title="Settings">
       <form className="field" onSubmit={(e) => {
         e.preventDefault();
-        onStartBalance(Number(new FormData(e.currentTarget).get('start')) || 0);
+        onStartBalance(Number(text(new FormData(e.currentTarget), 'start')) || 0);
       }}>
         <label htmlFor="s-start">Starting balance (before your first transaction)</label>
         <div className="row">
@@ -269,19 +280,26 @@ export function SettingsDialog({ open, onClose, startBalance, onStartBalance, on
           <button type="button" className="btn btn-ghost" onClick={onSample}>Load sample data</button>
         </div>
       </div>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        {confirmReset ? (
-          <>
-            <span className="error">Delete every transaction and budget? This can’t be undone.</span>
-            <span className="row">
-              <button type="button" className="btn btn-ghost" onClick={() => setConfirmReset(false)}>Keep</button>
-              <button type="button" className="btn btn-ghost danger-btn" onClick={onReset}>Delete all</button>
-            </span>
-          </>
-        ) : (
-          <button type="button" className="btn btn-ghost danger-btn" onClick={() => setConfirmReset(true)} disabled={!hasData}>Delete all data</button>
-        )}
-      </div>
+      <ResetRow onReset={onReset} hasData={hasData} />
     </Modal>
+  );
+}
+
+function ResetRow({ onReset, hasData }: { onReset: () => void; hasData: boolean }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="row" style={{ justifyContent: 'space-between' }}>
+      {confirm ? (
+        <>
+          <span className="error" role="alert">Delete every transaction and budget? This can’t be undone.</span>
+          <span className="row">
+            <button type="button" className="btn btn-ghost" onClick={() => setConfirm(false)}>Keep</button>
+            <button type="button" className="btn btn-ghost danger-btn" onClick={onReset}>Delete all</button>
+          </span>
+        </>
+      ) : (
+        <button type="button" className="btn btn-ghost danger-btn" onClick={() => setConfirm(true)} disabled={!hasData}>Delete all data</button>
+      )}
+    </div>
   );
 }

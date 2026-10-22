@@ -177,7 +177,7 @@ def add_income(date, description, amount, start_balance=None):
 def main():
     p = argparse.ArgumentParser(
         prog="tracker",
-        description="Day 1: Import CSV/Excel + Add expense (auto money_left) + Show recent"
+        description="Kharcha CLI: import statements, add expenses/income, show and summarize"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -262,7 +262,7 @@ def main():
             grouped = df.groupby("category")[["income", "expense"]].sum().sort_values("expense", ascending=False)
 
             print("\n📊 Category Summary")
-            print(grouped.to_string())
+            print(grouped.head(args.top).to_string())
 
             # Net totals
             total_income = df["income"].sum()
@@ -272,7 +272,7 @@ def main():
             print("\n Totals")
             print(f"Total Income : {total_income}")
             print(f"Total Expense: {total_expense}")
-            print(f"Net Balance  : {net}")
+            print(f"Net (in − out): {net}")
 
 
     elif args.cmd == "categorize":
@@ -281,22 +281,6 @@ def main():
         df2.to_csv(STORE, index=False)
         print("✅ Auto-categorized and saved to", STORE)
 
-    elif args.cmd == "summary":
-        df = load_store()
-        if df.empty:
-            print("No transactions yet.")
-        else:
-            df = auto_categorize(df)
-            totals = df.groupby("category")["money_spent"].sum().sort_values(ascending=False)
-            print(totals.head(args.top).to_string())
-
-    elif args.cmd == "income":
-        add_income(
-            date=args.date,
-            description=args.desc,
-            amount=args.amount,
-            start_balance=args.start
-        )
 
 if __name__ == "__main__":
     main()
